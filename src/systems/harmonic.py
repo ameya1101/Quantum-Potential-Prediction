@@ -8,25 +8,29 @@ class HarmonicOscillator(BaseSystem):
     def __init__(self, order, dim, mass, omega, domains) -> None:
         super().__init__(dim, domains)
         assert len(order) == dim, f"Insufficient quantum numbers ({len(order)}) for oscillator with dimension {dim}"
-        self._dim = dim
-        self._order = order
-        self._mass = mass
-        self._omega = omega
-        self._domains = domains
-        self._hbar = 1. # Use natural units
+        self.dim = dim
+        self.order = order
+        self.mass = mass
+        self.omega = omega
+        self.domains = domains
+        self.hbar = 1. # Use natural units
+    
+    def potential(self, x):
+        return torch.sum(0.5 * self.mass * self.omega ** 2 * x ** 2)
 
     @staticmethod
-    def hermite(x, degree):
+    def hermite(x, degree) -> torch.Tensor:
         return Hermite.apply(x, degree)
     
-    def wavefunction(self, x : torch.Tensor):
-        assert x.size()[0] == self._dim, f"Input coordinate dimensions ({x.size()[0]}) do not match system dimensions ({self._dim})."
+    def wavefunction(self, x : torch.Tensor) -> torch.Tensor:
+        assert x.size()[2] == self.dim, f"Input coordinate dimensions ({x.size()[1]}) do not match system dimensions ({self.dim})."
         
-        norm = ((self._mass * self._omega) / (np.pi * self._hbar)) ** 0.25
-        psi = torch.tensor(1., dtype=torch.float32, requires_grad=True)
-        for i in range(self._dim):
-            term1 = (factorial(self._order[i])) * (2 ** self._order[i])
-            term2 = (self.hermite(x[i, :], self._order[i]) / sqrt(term1))
-            expterms = (-1.0 * self._mass * self._omega * torch.square(x[i, :])) / (2 * self._hbar)
-            psi = psi * norm * term2 * torch.exp(expterms)
+        norm = ((self.mass * self.omega) / (np.pi * self.hbar)) ** 0.25
+        psi = torch.ones(1, 1, 1, requires_grad=True)
+
+        for i in range(self.dim):
+            term1 = (factorial(self.order[i])) * (2 ** self.order[i])
+            term2 = (self.hermite(x[:, :, i].unsqueeze(1), self.order[i]) / sqrt(term1)) # (N, 1) -> (N, 1, 1)
+            expterms = (-1.0 * self.mass * self.omega * torch.square(x[:, :, i].unsqueeze(1))) / (2 * self.hbar) # (N, 1) -> (N, 1, 1)
+            psi = psi * (norm * term2 * torch.exp(expterms))
         return psi
