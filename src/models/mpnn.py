@@ -16,11 +16,11 @@ class MPNN(nn.Module):
     
     def forward(self, x):
         h = self.layer1(x)
-        h = nn.ReLU(h)
+        h = nn.functional.relu(h)
         h = self.layer2(h)
-        h = nn.ReLU(h)
+        h = nn.functional.relu(h)
         h = self.layer3(h)
-        h = nn.ReLU(h)
-        h = nn.ReLU(self.layer4(h)) + h
+        h = nn.functional.relu(h)
+        h = nn.functional.relu(self.layer4(h)) + h
         out = self.layer5(h)
         return self.out_scaling * out

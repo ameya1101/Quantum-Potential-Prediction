@@ -1,10 +1,10 @@
 import torch
 
 class MetropolisSampler:
-    def __init__(self, wavefunction, N: int) -> None:
-        self.wavefunction = wavefunction
-        self.domains = wavefunction._domains
-        self.dim = wavefunction._dim
+    def __init__(self, system, N: int) -> None:
+        self.wavefunction = system.wavefunction
+        self.domains = system.domains
+        self.dim = system.dim
         self.N = N
         self.samples = torch.zeros(self.dim, self.N)
     
@@ -12,15 +12,18 @@ class MetropolisSampler:
         return (self.wavefunction(x)) ** 2
     
     def sample(self):
-        x0 = torch.ones_like(self.dim, 1) * 0.5
-        samples = torch.zeros(self.dim, self.N)
+        x0 = torch.ones(1, 1, self.dim)
+        for i, (d_min, d_max) in enumerate(self.domains):
+            x0[:, :, i] = (d_max - d_min)/2
+        
+        samples = torch.zeros(self.N, 1, self.dim)
         for i in range(self.N):
-            dx = torch.FloatTensor(self.dim, 1).uniform_(-0.6, 0.6)
+            dx = torch.FloatTensor(1, 1, self.dim).uniform_(-0.6, 0.6) # Why 0.6? Who knows.
             x1 = x0 + dx
             if self.prob(x0) < self.prob(x1):
                 x0 = x1
-            elif torch.random < (self.prob(x1) / self.prob(x0)):
+            elif torch.rand(1).item() < (self.prob(x1) / self.prob(x0)).item():
                 x0 = x1
-            
-            samples[:, i] = x0[:, 0]
-
+            samples[i, :, :] = x0[0, 0, :]
+        
+        return samples
