@@ -4,6 +4,9 @@ Code for CS F376 Design Project, Semester II 2021-22 on predicting quantum poten
 
 _**This repository is currently a work in progress**_
 
+### Requirements
+* `pytorch==1.7.1`
+
 ### Top-level directory layout
 
     .  

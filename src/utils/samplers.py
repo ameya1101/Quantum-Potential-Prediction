@@ -1,6 +1,17 @@
 import torch
+from .dataset import CoordinateData
 
 class MetropolisSampler:
+    '''
+    Class to implement the Metropolis sampler
+
+    Input
+    -----
+        system: BaseSystem
+            the quantum system to be evaluated
+        N: int
+            number of coordinates to sample
+    '''
     def __init__(self, system, N: int) -> None:
         self.wavefunction = system.wavefunction
         self.domains = system.domains
@@ -9,6 +20,7 @@ class MetropolisSampler:
         self.samples = torch.zeros(self.dim, self.N)
     
     def prob(self, x):
+        # Probability density for the sampler
         return (self.wavefunction(x)) ** 2
     
     def sample(self):
@@ -26,4 +38,14 @@ class MetropolisSampler:
                 x0 = x1
             samples[i, :, :] = x0[0, 0, :]
         
-        return samples
+        return CoordinateData(data=samples, N=self.N)
+
+class RandomSampler:
+    def __init__(self, system, N: int) -> None:
+        raise NotImplementedError
+    
+    def prob(self, x):
+        raise NotImplementedError
+    
+    def sample(self):
+        raise NotImplementedError

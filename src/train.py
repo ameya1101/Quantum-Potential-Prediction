@@ -1,10 +1,14 @@
-from typing import List
 import torch
 from torch.optim import Adam
 from torch.nn import MSELoss
+from torch.utils.data import DataLoader
+
+from models import MPNN
 from systems import HarmonicOscillator, BaseSystem
-from utils import MetropolisSampler
+from utils import MetropolisSampler, energy
+
 import argparse
+from typing import Tuple
 
 parser = argparse.ArgumentParser(description='The Metropolis Potential Neural Network.')
 parser.add_argument('--system', type=str, default='harmonic', choices=['harmonic'], help='which quantum system to run')
@@ -16,33 +20,22 @@ parser.add_argument('--mass', type=int, default=1, help='mass term for the harmo
 parser.add_argument('--omega', type=int, default=1, help='frequency of the harmonic oscillator')
 args = parser.parse_args()
 
-def laplacian(coords, psi):
-    xis = [xi.requires_grad_() for xi in coords.flatten(start_dim=1).t()]
-    xs_flat = torch.stack(xis, dim=1)
-    (dpsi_dxs, ) = torch.autograd.grad(psi, xs_flat, torch.ones_like(psi), create_graph=True)
-    laplacian = sum(
-        torch.autograd.grad(
-            dpsi_dxi, xi, torch.ones_like(dpsi_dxi), retain_graph=True
-        )[0]
-        for xi, dpsi_dxi in zip(xis, (dpsi_dxs[..., i] for i in range(len(xis))))
-    )
-
-    return laplacian # (1, N) tensor
-
-
-def energy(system: BaseSystem, coords: torch.Tensor, E_pot: torch.Tensor) -> List:
+def train(
+    model: torch.nn.Module, system: BaseSystem, n_epochs: int, 
+    dataloader: DataLoader, optimizer, criterion
+) -> Tuple:
     
-    psi = system.wavefunction(coords)
-    Hpsi = (-0.5 * laplacian(coords, psi)) + (E_pot.squeeze() * psi.squeeze()) # Laplacian is (1, N), while psi and E_pot are (N, 1, 1). 
-                                                                               # squeeze() brings everything to (1, N)
-    E_tot = torch.mean(Hpsi / psi.squeeze())
-
-    return E_tot, psi, Hpsi
-
-def train(model, system: BaseSystem, num_epochs, dataloader, optimizer, criterion):
     r0 = torch.ones(1, 1, system.dim) # initial fixed point
-    for epoch in range(num_epochs):
-        for n_batch, batch in enumerate(dataloader):
+
+    metrics = {
+        'loss' : [],
+        'energy' : []
+    }
+
+    for epoch in range(n_epochs):
+        avg_loss = 0
+        avg_energy = 0
+        for batch in dataloader:
             # Convert batch to a variable
             coords = torch.autograd.Variable(batch, requires_grad=True)
             E_pot = model(coords)
@@ -56,4 +49,40 @@ def train(model, system: BaseSystem, num_epochs, dataloader, optimizer, criterio
             loss.backward(retain_graph=True)
             optimizer.step()
 
-            #TODO: Logging metrics
+            # Log metrics
+            avg_loss += loss.item()
+            avg_energy += E_tot.item()
+        
+        metrics['loss'].append(avg_loss / len(dataloader))
+        metrics['energy'].append(avg_energy / len(dataloader))
+
+        print(f'Epoch {epoch}: Loss: {avg_loss / len(dataloader)} \t E_tot: {avg_energy / len(dataloader)}')
+
+    return model, metrics
+
+order = 1
+dim = args.dim
+mass = args.mass
+omega = args.omega
+domains = [[-5, 5], [-5, 5]]
+oscillator = HarmonicOscillator(order=order, dim=dim, mass=mass, omega=omega, domains=domains)
+
+batch_size = args.batch_size
+N = args.N
+sampler = MetropolisSampler(system=oscillator, N=N)
+data = sampler.sample()
+dataloader = DataLoader(data, batch_size=batch_size)
+
+model = MPNN(
+    in_size=dim,
+    out_scaling=12.5,
+    delta=0.01
+)
+criterion = MSELoss()
+optimizer = Adam(params=model.parameters())
+n_epochs=args.n_epochs
+
+model, metrics = train(
+    model=model, system=oscillator, n_epochs=n_epochs,
+    dataloader=dataloader, optimizer=optimizer, criterion=criterion
+)
