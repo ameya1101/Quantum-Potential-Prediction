@@ -17,7 +17,6 @@ class MetropolisSampler:
         self.domains = system.domains
         self.dim = system.dim
         self.N = N
-        self.samples = torch.zeros(self.dim, self.N)
     
     def prob(self, x):
         # Probability density for the sampler
@@ -42,10 +41,19 @@ class MetropolisSampler:
 
 class RandomSampler:
     def __init__(self, system, N: int) -> None:
-        raise NotImplementedError
+        self.wavefunction = system.wavefunction
+        self.domains = system.domains
+        self.dim = system.dim
+        self.N = N
     
     def prob(self, x):
-        raise NotImplementedError
+        # Probability density for the sampler
+        return (self.wavefunction(x)) ** 2
     
     def sample(self):
-        raise NotImplementedError
+        samples = torch.zeros(self.N, 1, self.dim)
+        for i, (d_min, d_max) in enumerate(self.domains):
+            x = (d_max - d_min) * torch.rand(self.N, 1) + d_min
+            samples[:, :, i] = x
+        
+        return CoordinateData(data=samples, N=self.N)
