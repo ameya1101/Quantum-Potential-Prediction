@@ -15,7 +15,8 @@ class MPNN(torch.nn.Module):
     '''
     def __init__(
         self, in_size: int, 
-        out_scaling: float, delta: float = 0.01
+        out_scaling: float, final_act=None,
+        delta: float = 0.01
     ) -> None:
         super(MPNN, self).__init__()
         self.layer1 = torch.nn.Linear(in_size, 32)
@@ -24,6 +25,7 @@ class MPNN(torch.nn.Module):
         self.layer4 = torch.nn.Linear(128, 128)
         self.layer5 = torch.nn.Linear(128, 1)
         self.out_scaling = out_scaling
+        self.final_act = final_act
 
         # Scale the model weights by delta
         for param in self.parameters():
@@ -37,6 +39,9 @@ class MPNN(torch.nn.Module):
         h = self.layer3(h)
         h = torch.nn.functional.relu(h)
         h = torch.nn.functional.relu(self.layer4(h)) + h
-        out = torch.sigmoid(self.layer5(h))
+        if self.final_act == 'sigmoid':
+            out = torch.sigmoid(self.layer5(h))
+        else:
+            out = self.layer5(h)
         return self.out_scaling * out
         
