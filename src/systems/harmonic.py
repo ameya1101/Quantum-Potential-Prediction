@@ -27,11 +27,9 @@ class HarmonicOscillator(BaseSystem):
     ) -> None:
         super().__init__(dim, domains)
         assert len(order) == dim, f"Insufficient quantum numbers ({len(order)}) for oscillator with dimension {dim}"
-        self.dim = dim
         self.order = order
         self.mass = mass
         self.omega = omega
-        self.domains = domains
         self.hbar = 1. # Use natural units
     
     def potential(self, x):
